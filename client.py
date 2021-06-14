@@ -1,7 +1,8 @@
-from sys import flags
+from sys import flags, setcheckinterval
 from threading import Thread
 import socket
 import time
+from typing import Tuple
 
 ADDRESS = "127.0.0.1"
 PORT = 5050
@@ -9,29 +10,52 @@ PORT = 5050
 scheme = 'utf-8'
 bufsize = 1024
 
+# This socket is connected with main server
 s = socket.socket()
 s.connect((ADDRESS,PORT))
 
-# ==================================================
-def client_communication():
-    print(s.recv(bufsize).decode(scheme))
-    message = input("Write your string > ")
-    s.send(message.encode(scheme))
-    print(s.recv(bufsize).decode(scheme))
-# ===================================================
+# ===========================================
+def communicate(service_socket):
+    serv_soc = socket.socket()
+    serv_soc.connect(service_socket)
+    message = input("Enter Your String ?> ")
+    serv_soc.send(f"{message}".encode(scheme))
+    print(serv_soc.recv(bufsize).decode(scheme))
 
-print("1 -> service 1 Echo , 2 -> service 2 Palindrome, 3 -> Service 3 Length")
+# ======================================
+# send username & password
+username = input("Enter Username > ")
+password = input("Enter Password > ")
+s.send(f"{username},{password}".encode(scheme))
+# -----------------
 
-option = input("Select Options 1 , 2 , 3")
+response = s.recv(bufsize).decode().split(",")
+if response[0] == "0":
+    print("USER DON'T exists")
+else:
+    print("USER EXISTS")
+    print("1 -> service 1 Echo , 2 -> service 2 Palindrome, 3 -> Service 3 Length")
 
-s.send(option.encode(scheme))
+    # receive Token and it means user is valid user
+    token = str(s.recv(bufsize).decode(scheme))
 
-if(option == "1"):
-    client_communication()
-elif option == "2":
-    client_communication()
-elif option == "3":
-    client_communication()
+    option = int(input("Select Options 1 (Echo) , 2(palindrome) , 3(find length) ?> "))
+    s.send(f"{username}  {token}  {int(option)}".encode(scheme))
+
+    status = s.recv(bufsize).decode(scheme)
+    if status == "1":
+        print("Token Validated")
+        addr , port = s.recv(bufsize).decode(scheme).split(",")
+        port = int(port)
+
+        # now we can talk with relevant server
+        communicate(tuple((addr,int(port))))
+
+
+    else:
+        print("In Valid Token")
+    
+
 
 s.close()
 

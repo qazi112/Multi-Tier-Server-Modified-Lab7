@@ -12,12 +12,10 @@ class ClientHandler_Thread(Thread):
 
     def run(self):
         
-        self.clientSoc.send(f"Dear Client of [{self.clientSoc.getsockname()}] Send String.".encode(scheme))
         message = self.clientSoc.recv(bufsize).decode(scheme)
-
         message = self.check_palindrome(message)
-        
         self.clientSoc.send(f"{message}".encode(scheme))
+        
         # close connection
         self.clientSoc.close()
 

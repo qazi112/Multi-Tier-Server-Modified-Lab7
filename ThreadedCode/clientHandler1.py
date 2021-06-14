@@ -11,8 +11,6 @@ class ClientHandler_Thread(Thread):
         self.clientSoc = clientSoc
 
     def run(self):
-        
-        self.clientSoc.send(f"Dear Client of [{self.clientSoc.getsockname()}] Send String.".encode(scheme))
         message = self.clientSoc.recv(bufsize).decode(scheme)
         self.clientSoc.send(f"{message}".encode(scheme))
         # close connection

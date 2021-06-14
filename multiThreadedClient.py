@@ -1,7 +1,13 @@
+from os import stat
 from threading import Thread
+from SERVER_DETAIL.servers_detail import servers
+# servers[4] -> ["127.0.0.1",5054] -> idendity server
+
 import socket
 import time
-
+import sys
+client_token = {}
+# client_token[username] = [token,self.soc]
 # ========================================
 
 scheme = "utf-8"
@@ -9,55 +15,68 @@ bufsize = 1024
 # ========================================
 
 class MultiThreadClient(Thread):
-    def __init__(self, clientSocket,server,option):
+    def __init__(self, clientSocket):
         Thread.__init__(self)
         self.clientSocket = clientSocket
-        self.server = server
-        self.service = int(option)
-
+        
     def run(self):
-        print(f"In Threaded Client, and this will connect with : {self.server} \n")
+        # main server gets the username & password from client
+        username, password = str(self.clientSocket.recv(bufsize).decode(scheme)).split(",")
 
-        # now become a client of respective server
-        s = socket.socket()
-        s.connect((self.server[0],int(self.server[1])))
-        print("Client Thread, Connected to server 1 \n")
-        # ==================================================
+        # contact with identity server
+        client_to_identity = socket.socket()
+        client_to_identity.connect((servers[4][0],servers[4][1]))
 
-        if(self.service == 1):
-            self.echo_server(s)
+        print(client_to_identity.getpeername())
+        client_to_identity.send(f"{username},{password}".encode(scheme))
+        # it will rerturn token for that user
+        token = str(client_to_identity.recv(bufsize).decode(scheme))
+        # Protocol -> if token == -1 -> send to client (0,NOT)
+        # if token != -1 -> send(1,OK)
 
-        elif(self.service == 2):
-            self.palindrome_check_server(s)
+        if token != "-1":
+            client_token[username.lower()] = [token,self.clientSocket]
 
-        elif(self.service == 3):
-            self.checkLength_server(s)
+            self.clientSocket.send("1,OK".encode(scheme))
+            print(client_token)
+            # now main server sends the client token
+            self.clientSocket.send(f"{token}".encode(scheme))
 
+            # client can now request for new service
+            # client will send username, token and serice 1,2 or 3
+            username,token,service = self.clientSocket.recv(bufsize).decode(scheme).split("  ")
+            service = int(service)
 
+            if self.is_validToken(username,token):
+                self.clientSocket.send("1".encode(scheme))
+                # now send client the relevent server address
+                addr = str(servers[int(service)][0])
+                port = servers[int(service)][1]
 
-    def echo_server(self,server_soc):
-        self.communication(server_soc)
-        
-    def palindrome_check_server(self,server_soc):
-        self.communication(server_soc)
-        
-    def checkLength_server(self,server_soc):
-        self.communication(server_soc)
-    
+                self.clientSocket.send(f"{addr},{port}".encode(scheme))
+                # My Work is done
+            else:
+                self.clientSocket.send("0".encode(scheme))
+                # end the connection
 
-
-
-    def communication(self,server_soc):
-        print(server_soc.recv(bufsize).decode(scheme))
-        print()
-        self.clientSocket.send("[Echo Server ]: Send String > \n".encode(scheme))
-
-        string = self.clientSocket.recv(bufsize).decode(scheme)
-        server_soc.send(string.encode(scheme))
-        message = server_soc.recv(bufsize)
-        print(message)
-        print()
-        time.sleep(1)
-        self.clientSocket.send(str(message).encode(scheme))
+        else:
+            print("User Don't Exits Database")
+            self.clientSocket.send("0,NOT".encode(scheme))
+            
+       
         self.clientSocket.close()
-    
+
+
+
+    # Checks whether the token sent by client is valid or not
+    def is_validToken(self,username,token):
+        status = False
+        if client_token.get(username.lower()) != None:
+            print("Valid User")
+            if client_token[username.lower()][0] == token:
+                status = True
+            else:
+                status = False
+        else:
+            print("Invalid User")
+        return status
